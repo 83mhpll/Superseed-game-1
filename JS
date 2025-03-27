@@ -1,0 +1,441 @@
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 800;
+canvas.height = 600;
+
+const startButton = document.getElementById('start-button');
+const restartButton = document.getElementById('restart-button');
+const shopButton = document.getElementById('shop-button');
+const mainMenu = document.getElementById('main-menu');
+const shop = document.getElementById('shop');
+const usernameInput = document.getElementById('username');
+const snakeSkinSelect = document.getElementById('snake-skin');
+const scoreDisplay = document.getElementById('score');
+const lengthDisplay = document.getElementById('length');
+const levelDisplay = document.getElementById('level');
+const personalBestDisplay = document.getElementById('personal-best');
+const suprBalanceDisplay = document.getElementById('supr-balance');
+const shopSuprBalanceDisplay = document.getElementById('shop-supr-balance');
+const btcBalanceDisplay = document.getElementById('btc-balance');
+const ethBalanceDisplay = document.getElementById('eth-balance');
+const opBalanceDisplay = document.getElementById('op-balance');
+
+const COLORS = {
+    BACKGROUND: '#0E273B',
+    SNAKE_WHITE: '#ffffff',
+    SNAKE_GOLD: '#FFD700',
+    SNAKE_BLUE: '#00CED1',
+    OBSTACLE: '#ff0000',
+    POWERUP_SPEED: '#00FF00',
+    POWERUP_CLEAR: '#FFFF00'
+};
+
+let snakeSkin = 'white';
+let snake = [{ x: 400, y: 300 }];
+let direction = { x: 0, y: 0 };
+let coins = [];
+let coinPool = [];
+let obstacles = [];
+let effects = [];
+let powerUps = [];
+let score = 0;
+let length = 10;
+let level = 1;
+let personalBest = JSON.parse(localStorage.getItem('personalBest')) || 0;
+let suprCoins = JSON.parse(localStorage.getItem('suprCoins')) || 0;
+let btc = JSON.parse(localStorage.getItem('btc')) || 0;
+let eth = JSON.parse(localStorage.getItem('eth')) || 0;
+let op = JSON.parse(localStorage.getItem('op')) || 0;
+let zoom = 1;
+let currentUsername = '';
+let lastTime = 0;
+const FPS = 60;
+const frameTime = 1000 / FPS;
+let speedBoost = 1;
+let speedBoostTimer = 0;
+
+const coinImage = new Image();
+coinImage.src = 'https://github.com/superseed-xyz/brand-kit/raw/main/logos-wordmarks/logos/small.png';
+
+// เสียง (ต้องดาวน์โหลดไฟล์ .mp3)
+const coinSound = new Audio('coin.mp3');
+const hitSound = new Audio('hit.mp3');
+const gameOverSound = new Audio('gameover.mp3');
+const powerUpSound = new Audio('powerup.mp3');
+
+startButton.addEventListener('click', startGame);
+restartButton.addEventListener('click', startGame);
+shopButton.addEventListener('click', () => {
+    shop.style.display = 'block';
+    updateShop();
+});
+document.getElementById('close-shop').addEventListener('click', () => {
+    shop.style.display = 'none';
+});
+document.getElementById('buy-btc').addEventListener('click', () => buyCoin('btc'));
+document.getElementById('buy-eth').addEventListener('click', () => buyCoin('eth'));
+document.getElementById('buy-op').addEventListener('click', () => buyCoin('op'));
+
+function startGame() {
+    currentUsername = usernameInput.value.trim() || 'Anonymous';
+    snakeSkin = snakeSkinSelect.value;
+    mainMenu.style.display = 'none';
+    canvas.style.display = 'block';
+    startButton.style.display = 'block';
+    restartButton.style.display = 'none';
+    shop.style.display = 'none';
+    initGame();
+}
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left) / zoom;
+    const mouseY = (e.clientY - rect.top) / zoom;
+    const angle = Math.atan2(mouseY - snake[0].y, mouseX - snake[0].x);
+    direction.x = Math.cos(angle) * 3 * speedBoost;
+    direction.y = Math.sin(angle) * 3 * speedBoost;
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === '+') zoom = Math.min(zoom + 0.1, 2);
+    if (e.key === '-') zoom = Math.max(zoom - 0.1, 0.5);
+});
+
+function initGame() {
+    coins = [];
+    obstacles = [];
+    powerUps = [];
+    snake = [{ x: 400, y: 300 }];
+    direction = { x: 0, y: 0 };
+    score = 0;
+    length = 10;
+    level = 1;
+    speedBoost = 1;
+    speedBoostTimer = 0;
+    spawnCoins();
+    updatePersonalBest();
+    updateSuprBalance();
+    gameLoop(performance.now());
+}
+
+function spawnCoins() {
+    for (let i = 0; i < 10; i++) {
+        let coin = coinPool.pop() || {};
+        coin.x = Math.random() * canvas.width;
+        coin.y = Math.random() * canvas.height;
+        coin.size = Math.random() * 25 + (score > 5000 ? 10 : 15);
+        coins.push(coin);
+    }
+}
+
+function recycleCoin(coin) {
+    coinPool.push(coin);
+}
+
+function spawnObstacles() {
+    obstacles = [];
+    const obstacleCount = level - 1;
+    for (let i = 0; i < obstacleCount; i++) {
+        obstacles.push({
+            x: Math.random() * (canvas.width - 50),
+            y: Math.random() * (canvas.height - 50),
+            width: 40,
+            height: 40
+        });
+    }
+}
+
+function spawnPowerUps() {
+    if (Math.random() < 0.02) {
+        powerUps.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            type: Math.random() < 0.5 ? 'speed' : 'clear'
+        });
+    }
+}
+
+function drawSnake(timestamp) {
+    snake.forEach((segment, index) => {
+        const animationOffset = Math.sin(timestamp / 200 + index) * 2;
+        ctx.fillStyle = snakeSkin === 'white' ? COLORS.SNAKE_WHITE : snakeSkin === 'gold' ? COLORS.SNAKE_GOLD : COLORS.SNAKE_BLUE;
+        if (index === 0) {
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(segment.x - 4, segment.y - 4, 2, 0, Math.PI * 2);
+            ctx.arc(segment.x + 4, segment.y - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.arc(segment.x, segment.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#00000033';
+            ctx.fillRect(segment.x - 5 + animationOffset, segment.y - 2, 10, 4);
+        }
+    });
+}
+
+function drawObstacles() {
+    obstacles.forEach(obstacle => {
+        ctx.fillStyle = COLORS.OBSTACLE;
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    });
+}
+
+function drawPowerUps() {
+    powerUps.forEach((pu, index) => {
+        ctx.fillStyle = pu.type === 'speed' ? COLORS.POWERUP_SPEED : COLORS.POWERUP_CLEAR;
+        ctx.beginPath();
+        ctx.arc(pu.x, pu.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        if (Math.hypot(pu.x - snake[0].x, pu.y - snake[0].y) < 22) {
+            powerUpSound.play();
+            powerUps.splice(index, 1);
+            if (pu.type === 'speed') {
+                speedBoost = 1.5;
+                speedBoostTimer = 300;
+            } else if (pu.type === 'clear') {
+                obstacles = [];
+            }
+        }
+    });
+}
+
+function addEffect(x, y) {
+    effects.push({ x, y, radius: 5, alpha: 1 });
+}
+
+function drawEffects() {
+    effects.forEach((effect, index) => {
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 215, 0, ${effect.alpha})`;
+        ctx.fill();
+        effect.radius += 1;
+        effect.alpha -= 0.05;
+        if (effect.alpha <= 0) effects.splice(index, 1);
+    });
+}
+
+function gameLoop(timestamp) {
+    if (timestamp - lastTime < frameTime) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    lastTime = timestamp;
+
+    ctx.fillStyle = COLORS.BACKGROUND;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+    snake.unshift(head);
+    if (snake.length > length) snake.pop();
+
+    if (speedBoostTimer > 0) {
+        speedBoostTimer--;
+        if (speedBoostTimer === 0) speedBoost = 1;
+    }
+
+    if (score >= 6000 && level < 5) level = 5;
+    else if (score >= 5000 && level < 4) level = 4;
+    else if (score >= 4000 && level < 3) level = 3;
+    else if (score >= 3000 && level < 2) level = 2;
+    if (level > 1 && obstacles.length === 0) spawnObstacles();
+
+    spawnPowerUps();
+    drawSnake(timestamp);
+    if (level > 1) drawObstacles();
+    drawPowerUps();
+
+    coins.forEach((coin, index) => {
+        ctx.drawImage(coinImage, coin.x - coin.size / 2, coin.y - coin.size / 2, coin.size, coin.size);
+        if (Math.hypot(coin.x - head.x, coin.y - head.y) < coin.size / 2 + 12) {
+            coinSound.play();
+            addEffect(coin.x, coin.y);
+            coins.splice(index, 1);
+            score += Math.floor(coin.size / 2);
+            length += 1;
+            recycleCoin(coins[coins.length - 1]);
+            coins.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 25 + (score > 5000 ? 10 : 15)
+            });
+        }
+    });
+
+    drawEffects();
+
+    for (let obstacle of obstacles) {
+        if (head.x < obstacle.x + obstacle.width &&
+            head.x + 12 > obstacle.x &&
+            head.y < obstacle.y + obstacle.height &&
+            head.y + 12 > obstacle.y) {
+            hitSound.play();
+            endGame();
+            return;
+        }
+    }
+
+    scoreDisplay.textContent = score;
+    lengthDisplay.textContent = length;
+    levelDisplay.textContent = level;
+
+    if (head.x < 0 || head.x > canvas.width || head.y < 0 || head.y > canvas.height) {
+        gameOverSound.play();
+        endGame();
+        return;
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+    suprCoins += Math.floor(score / 1000) * 10;
+    localStorage.setItem('suprCoins', JSON.stringify(suprCoins));
+    if (score > personalBest) {
+        personalBest = score;
+        localStorage.setItem('personalBest', JSON.stringify(personalBest));
+    }
+    canvas.style.display = 'none';
+    mainMenu.style.display = 'flex';
+    startButton.style.display = 'none';
+    restartButton.style.display = 'block';
+    updatePersonalBest();
+    updateSuprBalance();
+}
+
+function updatePersonalBest() {
+    personalBestDisplay.textContent = personalBest;
+}
+
+function updateSuprBalance() {
+    suprBalanceDisplay.textContent = suprCoins;
+    shopSuprBalanceDisplay.textContent = suprCoins;
+}
+
+function updateShop() {
+    shopSuprBalanceDisplay.textContent = suprCoins;
+    btcBalanceDisplay.textContent = btc;
+    ethBalanceDisplay.textContent = eth;
+    opBalanceDisplay.textContent = op;
+}
+
+function buyCoin(type) {
+    if (suprCoins >= 100) {
+        suprCoins -= 100;
+        if (type === 'btc') btc += 1;
+        else if (type === 'eth') eth += 1;
+        else if (type === 'op') op += 1;
+        localStorage.setItem('suprCoins', JSON.stringify(suprCoins));
+        localStorage.setItem('btc', JSON.stringify(btc));
+        localStorage.setItem('eth', JSON.stringify(eth));
+        localStorage.setItem('op', JSON.stringify(op));
+        updateShop();
+    } else {
+        alert('Not enough SUPR Coins!');
+    }
+} 
+
+// ... (โค้ดส่วนอื่นๆ คงเดิม)
+
+// ฟังก์ชันตรวจสอบระดับสิ่งกีดขวางตามคะแนน
+function getObstacleLevel(score) {
+    if (score >= 1000) {
+        return Math.floor((score - 1000) / 1000) + 1;
+    }
+    return 0;
+}
+
+// ฟังก์ชันสร้างสิ่งกีดขวาง
+function spawnObstacles(obstacleCount) {
+    obstacles = [];
+    for (let i = 0; i < obstacleCount; i++) {
+        obstacles.push({
+            x: Math.random() * (canvas.width - 50),
+            y: Math.random() * (canvas.height - 50),
+            width: 40,
+            height: 40
+        });
+    }
+}
+
+// ... (โค้ดส่วนอื่นๆ คงเดิม)
+
+function gameLoop(timestamp) {
+    if (timestamp - lastTime < frameTime) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    lastTime = timestamp;
+
+    ctx.fillStyle = COLORS.BACKGROUND;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+    snake.unshift(head);
+    if (snake.length > length) snake.pop();
+
+    if (speedBoostTimer > 0) {
+        speedBoostTimer--;
+        if (speedBoostTimer === 0) speedBoost = 1;
+    }
+
+    // ตรวจสอบระดับสิ่งกีดขวางตามคะแนน
+    const obstacleLevel = getObstacleLevel(score);
+    if (obstacleLevel > 0 && obstacles.length === 0) {
+        spawnObstacles(obstacleLevel);
+    }
+
+    spawnPowerUps();
+    drawSnake(timestamp);
+    if (obstacleLevel > 0) drawObstacles();
+    drawPowerUps();
+
+    coins.forEach((coin, index) => {
+        ctx.drawImage(coinImage, coin.x - coin.size / 2, coin.y - coin.size / 2, coin.size, coin.size);
+        if (Math.hypot(coin.x - head.x, coin.y - head.y) < coin.size / 2 + 12) {
+            coinSound.play();
+            addEffect(coin.x, coin.y);
+            coins.splice(index, 1);
+            score += Math.floor(coin.size / 2);
+            length += 1;
+            recycleCoin(coins[coins.length - 1]);
+            coins.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 25 + (score > 5000 ? 10 : 15)
+            });
+        }
+    });
+
+    drawEffects();
+
+    for (let obstacle of obstacles) {
+        if (head.x < obstacle.x + obstacle.width &&
+            head.x + 12 > obstacle.x &&
+            head.y < obstacle.y + obstacle.height &&
+            head.y + 12 > obstacle.y) {
+            hitSound.play();
+            endGame();
+            return;
+        }
+    }
+
+    scoreDisplay.textContent = score;
+    lengthDisplay.textContent = length;
+    levelDisplay.textContent = level;
+
+    if (head.x < 0 || head.x > canvas.width || head.y < 0 || head.y > canvas.height) {
+        gameOverSound.play();
+        endGame();
+        return;
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// ... (โค้ดส่วนอื่นๆ คงเดิม)
