@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperseedXYZ Slither</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- หน้าจอหลัก -->
+        <div id="main-menu">
+            <img src="https://github.com/superseed-xyz/brand-kit/raw/main/logos-wordmarks/extra-wordmarks/large-black.svg" alt="Superseed Logo" id="logo">
+            <h1>Superseed Slither</h1>
+            <input type="text" id="username" placeholder="Enter Username" maxlength="15">
+            <select id="snake-skin">
+                <option value="white" data-icon="https://github.com/83mhpll/Game-for-superseed/raw/main/Superseed.png">White Snake</option>
+                <option value="gold" data-icon="https://github.com/83mhpll/Game-for-superseed/raw/main/pngegg.png">Gold Snake</option>
+                <option value="blue" data-icon="https://github.com/83mhpll/Game-for-superseed/raw/main/hd-ethereum-eth-purple-logo-sign-png-701751694771769kxirapfr36.png">Blue Snake</option>
+            </select>
+            <p id="supr-coins">SUPR Coins: <span id="supr-balance">0</span></p>
+            <p id="best-score">Your Best Score: <span id="personal-best">0</span></p>
+            <button id="start-button">Start Game</button>
+            <button id="restart-button" style="display: none;">Play Again</button>
+            <button id="shop-button">Shop</button>
+            <!-- ร้านค้า -->
+            <div id="shop" style="display: none;">
+                <h2>Shop</h2>
+                <p><img src="https://github.com/superseed-xyz/brand-kit/raw/main/logos-wordmarks/logos/default-black.svg" alt="SUPR" class="coin-icon"> Balance: <span id="shop-supr-balance">0</span></p>
+                <div class="shop-item">
+                    <img src="https://github.com/83mhpll/Game-for-superseed/raw/main/pngegg.png" alt="BTC" class="coin-icon">
+                    <span>BTC (100 SUPR)</span>
+                    <button id="buy-btc">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <img src="https://github.com/83mhpll/Game-for-superseed/raw/main/hd-ethereum-eth-purple-logo-sign-png-701751694771769kxirapfr36.png" alt="ETH" class="coin-icon">
+                    <span>ETH (100 SUPR)</span>
+                    <button id="buy-eth">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <img src="https://github.com/83mhpll/Game-for-superseed/raw/main/optimism-3d-icon-download-in-png-blend-fbx-gltf-file-formats--bitcoin-logo-coin-cryptocurrency-symbol-crypto-coins-vol2-pack-science-technology-icons-7947879.webp" alt="OP" class="coin-icon">
+                    <span>OP (100 SUPR)</span>
+                    <button id="buy-op">Buy</button>
+                </div>
+                <p>Owned: BTC <span id="btc-balance">0</span> | ETH <span id="eth-balance">0</span> | OP <span id="op-balance">0</span></p>
+                <button id="close-shop">Close</button>
+            </div>
+        </div>
+
+        <!-- พื้นที่เกม -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- แถบคะแนน -->
+        <div id="score-board">
+            <span>Score: <span id="score">0</span></span>
+            <span>Length: <span id="length">10</span></span>
+            <span>Level: <span id="level">1</span></span>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
